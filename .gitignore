@@ -1,0 +1,6 @@
+data/
+debug.log
+**/__pycache__
+# pixi environments
+.pixi
+*.egg-info

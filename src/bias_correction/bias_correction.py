@@ -1,0 +1,234 @@
+import pandas as pd
+from pathlib import Path
+from scipy.stats import ecdf
+from loguru import logger
+from tabulate import tabulate
+import pyarrow.dataset as pds
+
+import numpy as np
+import pyarrow as pa 
+import pyarrow.parquet as pq
+
+
+def correct_bias_with_era5_and_save(seeds: list, 
+                                    tracks_with_env_ds: pds.Dataset, 
+                                    clim_obs_histo: pd.DataFrame, 
+                                    clim_sim_histo: pd.DataFrame,  
+                                    model: str, 
+                                    experiment: str, 
+                                    save_dir: Path,) -> None:
+    save_dir = Path(save_dir)
+    # TODO: add consistency by rescaling when fetching from pangeo API
+    clim_sim_histo = clim_sim_histo.assign(nshr=clim_sim_histo["nshr"] / 100.) 
+    # TODO: refactor for managing all seeds
+    tracks = (
+        tracks_with_env_ds.to_table(filter=(pds.field("seed").isin(seeds)))
+        .to_pandas()
+        .rename(columns={"psl": "MSLP", "hur": "nshr", "tos": "SST", "ta": "T_strat"})
+    )
+    if not tracks.empty:
+        # TODO: clean
+        tracks = tracks.assign(
+            MSLP=tracks["MSLP"] / 100.0,
+            nshr=tracks["nshr"] / 100.0,
+            thermo_eff=((tracks["SST"]+273.15) - tracks["T_strat"]) / (tracks["SST"]+273.15),
+        )
+
+        for clim_var in ["thermo_eff", "nshr", "MSLP"]: 
+            logger.info(f"Correcting bias for climate variable {clim_var}")
+            tracks = apply_bias_correction(
+                benchmark=clim_obs_histo,
+                df_gcm_hist=clim_sim_histo,
+                tracks=tracks,
+                variable=clim_var,
+            )
+        # Convert to Arrow Table
+        table = pa.Table.from_pandas(tracks)
+
+        #Write Hive-style partitioned Parquet
+        logger.info(f"Writing dataset to {save_dir / model / experiment}")
+        pq.write_to_dataset(
+            table=table,
+            root_path=save_dir / model / experiment,  # output path
+            partition_cols=["seed", "year", "month"],  # Hive-style columns
+            existing_data_behavior="overwrite_or_ignore",  # optional: clean write
+        )
+    # else:
+    #     logger.info(f"No data to correct for year:{year}, month:{month}")
+    
+
+
+def apply_bias_correction(benchmark, df_gcm_hist, tracks, variable="thermo_eff"):
+    """
+    Applies bias correction to the variable column of a future tracks DataFrame
+    using the CDF transformation method based on observed and historical GCM data.
+
+    This function corrects the variable values in the 'tracks' DataFrame using
+    the observed 'benchmark' data as a reference for the historical period and
+    the 'df_gcm_hist' as the historical GCM data. The correction is performed by
+    applying a CDF transformation (CDFt) to align the future GCM data ('tracks')
+    with the observed historical data ('benchmark').
+
+    Parameters:
+    -----------
+    - benchmark (pd.DataFrame): DataFrame containing observed historical data.
+    - df_gcm_hist (pd.DataFrame): DataFrame containing historical GCM data.
+    - tracks (pd.DataFrame): DataFrame containing future period data to be corrected.
+    - variable (str, optional): The column to be corrected. Defaults to 'thermo_eff'. This column should be present in all three DataFrames.
+
+    Returns:
+    ---------
+    - pd.DataFrame: The 'tracks' DataFrame with the 'variable' column bias-corrected
+      based on the observed historical and historical GCM data.
+
+    Note:
+    -------
+    - NaN values are excluded from the correction process and their positions in 'tracks'
+      are preserved.
+
+    """
+
+    def collect_statistics(data):
+        """Helper function to collect statistics for given data."""
+        return {
+            "Metric": [
+                "Length",
+                "Mean",
+                "Std Dev",
+                "Skewness",
+                "Min",
+                "25th Quantile",
+                "75th Quantile",
+                "Max",
+            ],
+            "Value": [
+                len(data),
+                round(np.mean(data), 3),
+                round(np.std(data), 3),
+                round(pd.Series(data).skew(), 3),
+                round(np.min(data), 3),
+                round(np.quantile(data, 0.25), 3),
+                round(np.quantile(data, 0.75), 3),
+                round(np.max(data), 3),
+            ],
+        }
+
+    # Step 1: Extract thermo_eff values from each DataFrame, excluding NaNs
+    O = benchmark[variable].dropna().values
+    Gp = df_gcm_hist[variable].dropna().values
+    Gf = tracks[variable].dropna().values
+
+    # Step 2: Apply the CDFt function for bias correction
+    # Note: This assumes CDFt function can handle and return numpy arrays directly
+    CT = CDFt(O, Gp, Gf)
+    corrected_thermo_eff = CT["DS"]
+
+    # Step 3: Collect statistics for all datasets
+    stats_dict = {
+        "O (Observed (ERA5))": collect_statistics(O),
+        "Gp (GCM Historical)": collect_statistics(Gp),
+        "Gf (Future)": collect_statistics(Gf),
+        "Corrected Gf (Future)": collect_statistics(corrected_thermo_eff),
+    }
+    print_summary_statistics(stats_dict)
+
+    # Step 4: Replace the corrected thermo_eff values back into the tracks DataFrame
+    # First, create a boolean mask to identify non-NaN indices for replacement
+    non_nan_indices = ~tracks[variable].isna()
+
+    # Then, replace only the non-NaN values with the corrected values
+    # This step assumes the length of corrected_thermo_eff matches the number of non-NaN entries in tracks['thermo_eff']
+    tracks.loc[non_nan_indices, variable] = corrected_thermo_eff
+    # Now, 'tracks' contains the corrected 'thermo_eff' values aligned with their original indices
+
+    return tracks
+
+
+def print_summary_statistics(stats_dict):
+    """
+    Prints summary statistics for multiple data arrays in a single table using tabulate for clear terminal output.
+
+    Parameters:
+    -----------
+    - stats_dict (dict): A dictionary where keys are dataset labels and values are dictionaries of statistics.
+
+    """
+    # Transform stats_dict to a format suitable for tabulate
+    table_data = []
+    for label, stats in stats_dict.items():
+        row = [label] + stats["Value"]
+        table_data.append(row)
+
+    headers = ["Dataset"] + stats_dict[next(iter(stats_dict))]["Metric"]
+    logger.info(tabulate(table_data, headers=headers, tablefmt="pretty"))
+
+
+def CDFt(ObsRp, DataGp, DataGf, npas=1000, dev=2):
+    mO = np.nanmean(ObsRp)
+    mGp = np.nanmean(DataGp)
+    DataGp2 = DataGp + (mO - mGp)
+    DataGf2 = DataGf + (mO - mGp)
+
+    # Calculate empirical CDFs
+    FRp = ecdf(ObsRp)
+    FGp = ecdf(DataGp2)
+    FGf = ecdf(DataGf2)
+
+    a = np.abs(np.nanmean(DataGf) - mGp)
+    combined_data = np.concatenate(
+        (ObsRp[~np.isnan(ObsRp)], DataGp[~np.isnan(DataGp)], DataGf[~np.isnan(DataGf)])
+    )
+
+    m = np.min(combined_data) - dev * a
+    M = np.max(combined_data) + dev * a
+
+    x = np.linspace(m, M, npas)
+
+    FRP = FRp.cdf.evaluate(x)
+    FGP = FGp.cdf.evaluate(x)
+    FGF = FGf.cdf.evaluate(x)
+
+    FGPm1_FGF = np.quantile(DataGp2, FGF[~np.isnan(FGF)])
+
+    FRF = FRp.cdf.evaluate(FGPm1_FGF)
+
+    if np.nanmin(ObsRp) < np.nanmin(DataGf2):
+        i = np.argmax(x >= np.quantile(ObsRp, FRF[0]))
+        j = np.argmax(x >= np.nanmin(DataGf2))
+
+        k = i
+        while j > 0 and k > 0:
+            FRF[j] = FRP[k]
+            j -= 1
+            k -= 1
+
+        if j > 0:
+            FRF[:j] = 0
+
+    if FRF[-1] < 1:
+        i = np.argmax(x >= np.quantile(ObsRp, FRF[-1]))
+        j = np.where(FRF != FRF[-1])[0][-1]
+
+        if j == 0:
+            raise ValueError("In CDFt, dev must be higher")
+
+        dif = min(len(x) - j, len(x) - i)
+        FRF[j : j + dif] = FRP[i : i + dif]
+        k = j + dif
+
+        if k < len(x):
+            FRF[k:] = 1
+
+    NaNs_indices = np.isnan(DataGf2)
+
+    qntl = np.full(DataGf2.shape, np.nan)
+    qntl[~NaNs_indices] = FGf.cdf.evaluate(DataGf2[~NaNs_indices])
+
+    xx = np.interp(qntl, FRF, x, left=x[0], right=x[-1])
+
+    FGp = ecdf(DataGp)
+    FGf = ecdf(DataGf)
+    FGP = FGp.cdf.evaluate(x)
+    FGF = FGf.cdf.evaluate(x)
+
+    return {"x": x, "FRp": FRP, "FGp": FGP, "FGf": FGF, "FRf": FRF, "DS": xx}

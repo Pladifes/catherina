@@ -1,0 +1,73 @@
+[project]
+authors = ["Hamada Saleh <hamada.saleh@institutlouisbachelier.org>"]
+channels = ["conda-forge"]
+description = "Add a short description here"
+name = "catherina_v2"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+polars = ">=1.27.1,<2"
+geopandas = ">=1.0.1,<2"
+tqdm = ">=4.67.1,<5"
+seaborn = ">=0.13.2,<0.14"
+tabulate = ">=0.9.0,<0.10"
+netcdf4 = ">=1.7.2,<2"
+xarray = ">=2025.3.1,<2026"
+boto3 = ">=1.37.35,<2"
+fsspec = ">=2025.3.2,<2026"
+pyarrow = ">=19.0.1,<20"
+ipykernel = ">=6.29.5,<7"
+cdsapi = ">=0.7.5,<0.8"
+ipywidgets = ">=8.1.6,<9"
+iprogress = ">=0.4,<0.5"
+toml = ">=0.10.2,<0.11"
+loguru = ">=0.7.2,<0.8"
+typer = ">=0.15.2,<0.16"
+rich = ">=14.0.0,<15"
+python = ">=3.13.3,<3.14"
+gputil = ">=1.4.0,<2"
+pytest = ">=8.3.5,<9"
+dask-geopandas = ">=0.4.3,<0.5"
+rasterio = ">=1.4.3,<2"
+funcy = ">=2.0,<3"
+dask = ">=2025.3.0,<2026"
+python-calamine = ">=0.3.2,<0.4"
+ruff = ">=0.11.5,<0.12"
+line_profiler = ">=4.2.0,<5"
+more-itertools = ">=10.6.0,<11"
+plotly = ">=6.0.1,<7"
+nbformat = ">=5.10.4,<6"
+cartopy = ">=0.25.0,<0.26"
+altair = ">=5.5.0,<6"
+vegafusion = ">=2.0.1,<3"
+vl-convert-python = ">=1.7.0,<2"
+pooch = ">=1.8.2,<2"
+xmip = ">=0.7.2,<0.8"
+intake-esm = ">=2025.2.3,<2026"
+flox = ">=0.10.1,<0.11"
+h5netcdf = ">=1.6.1,<2"
+xesmf = ">=0.8.8,<0.9"
+esmf = ">=8.7.0,<9"
+esmpy = ">=8.7.0,<9"
+requests = ">=2.32.3,<3"
+aiohttp = ">=3.11.16,<4"
+gcsfs = ">=2025.3.2,<2026"
+pystac-client = ">=0.8.6,<0.9"
+planetary-computer = ">=1.0.0,<2"
+adlfs = ">=2024.12.0,<2025"
+metpy = ">=1.7.0,<2"
+xclim = ">=0.57.0,<0.58"
+rioxarray = ">=0.19.0,<0.20"
+geodatasets = ">=2024.8.0,<2025"
+
+[pypi-dependencies]
+tqdm-joblib = ">=0.0.4, <0.0.5"
+more-itertools = "*"
+
+[tasks]
+pangeo = 'python src/data/cmip6_pangeo.py'
+synth = 'python synthetic_tracks.py'
+intens = 'python intensify.py'
+
+test = 'pytest tests/ -v --tb=short'
