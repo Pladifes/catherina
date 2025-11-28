@@ -124,7 +124,7 @@ def main(
     Simulate starting points
     TODO: set displace=True
     """
-    logger.info("Crete starting point...")
+    logger.info("Create starting point...")
 
     simulate_tc_genesis(
         ibtracs=ibtracs,

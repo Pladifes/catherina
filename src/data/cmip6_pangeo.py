@@ -83,7 +83,7 @@ def get_cmip6_data_from_pangeo_api(
                     # Assign cf-compliant bounds for regridding
                     ds_clim["lon"].attrs["bounds"] = "lon_b"
                     ds_clim["lat"].attrs["bounds"] = "lat_b"
-                    print(ds_clim.cf.describe())
+                    print(ds_clim.cf)
                 elif query["table_id"] == "Omon":
                     # Assign cf-compliant bounds for regridding
                     # For some reason, bounds attributes are dropped after regridding
@@ -97,7 +97,9 @@ def get_cmip6_data_from_pangeo_api(
                 # Print output grid
                 print(ds_out)
                 # Rechunk before regridding, to avoid the entire dataset being loaded into memory
-                ds_clim = ds_clim.chunk({"time": 10, "y": -1, "x": -1})
+                # ds_clim = ds_clim.chunk({"time": 10, "y": -1, "x": -1}) # TODO: old chunking strategy seems not to be working anymore
+                var = query["variable_id"]
+                ds_clim[var] = ds_clim[var].chunk({"time": 10, "y": -1, "x": -1})
                 # Create regridder (using first-order conservative method)
                 regridder = xe.Regridder(
                     ds_clim, ds_out, "conservative", ignore_degenerate=True
@@ -114,6 +116,7 @@ def get_cmip6_data_from_pangeo_api(
                 ds_out.to_zarr(
                     Path(store_dir) / f"{source_id}/{experiment_id}",
                     mode="a",
+                    zarr_format=2
                 )
 
 
@@ -187,10 +190,10 @@ if __name__ == "__main__":
     source_id = ["ACCESS-CM2"] #, "MIROC-ES2L"] #"UKESM1-0-LL"]
     pprint.pprint(source_id)
     # "MPI-ESM1-2-LR", "ACCESS-CM2"
-    experiment_id = ["historical", "ssp585"]
+    experiment_id = ["ssp585"]
     pprint.pprint(f"experiments: {experiment_id}")
     tbl_var = {"Amon": ["hurs", "psl", "ta", ], "Omon": ["tos"]}
-    store_dir = "./data/cmip6_data"
+    store_dir = "./data/input/cmip6_data"
     print(f"Save dir: {store_dir}")
     get_cmip6_data_from_pangeo_api(
         source_id=source_id, experiment_id=experiment_id, store_dir=store_dir
