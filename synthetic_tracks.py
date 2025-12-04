@@ -27,8 +27,6 @@ from src.bias_correction.bias_correction import correct_bias_with_era5_and_save
 from src.intensitifcation_and_decay.intensify import intensify_and_save
 
 
-
-
 def main(
     config_path: str = "./config.toml",
 ) -> None:
@@ -42,41 +40,42 @@ def main(
     ) as f:  # Open the file in binary mode
         config_files = tomllib.load(f)
 
-    #Get config
+    # Get config
     main_config = config_files["main_params"]
     gen_config = config_files["generation"]
     intens_config = config_files["intensification"]
 
-    #Number seeds + jobs + batch size + nb steps
+    # Number seeds + jobs + batch size + nb steps
     n_seeds = main_config["n_seeds"]
-    n_job =  main_config["n_jobs"]
-    batch_seed_size =  main_config["batch_seeds_size"]
+    n_job = main_config["n_jobs"]
+    batch_seed_size = main_config["batch_seeds_size"]
     max_step = gen_config["max_steps"]
-    
 
-    #Start and end years
-    start_year = main_config['start_year']
-    end_year = main_config['end_year']
+    # Start and end years
+    start_year = main_config["start_year"]
+    end_year = main_config["end_year"]
 
-    #Model and experiment
-    model = main_config["models"][0] 
+    # Model and experiment
+    model = main_config["models"][0]
     experiment = main_config["experiments"][0]
 
-    #Get folder names for project
-    #Project
+    # Get folder names for project
+    # Project
     data_dir = Path(main_config["input_data_dir"])
     output_dir = Path(main_config["output_data_dir"])
-    cyclones_tracks_dir = output_dir/ "genesis" 
-    tracks_dir = output_dir/ "track"
-    tracks_with_env_dir = output_dir/ "track_with_env" / model / experiment
-    tracks_with_env_corr_dir = output_dir /"track_with_env_corr" / model / experiment
+    cyclones_tracks_dir = output_dir / "genesis"
+    tracks_dir = output_dir / "track"
+    tracks_with_env_dir = output_dir / "track_with_env" / model / experiment
+    tracks_with_env_corr_dir = output_dir / "track_with_env_corr" / model / experiment
     intens_dir = output_dir / "intensified_tracks" / model / experiment
-    #Additionnal data
+    # Additionnal data
     cmip_dir = data_dir / Path(main_config["climate_data_dir"])
     fit_dir = data_dir / Path(gen_config["fit_dir"])
     catherina_fit_path = fit_dir / "Catherina_fit.db"
     land_zip_path = data_dir / Path(intens_config["ne_10m_land_zip_path"])
-    ne_10m_coastline_zip_path = data_dir / Path(intens_config["ne_10m_coastline_zip_path"])
+    ne_10m_coastline_zip_path = data_dir / Path(
+        intens_config["ne_10m_coastline_zip_path"]
+    )
     bias_correction_path = data_dir / Path(main_config["bcorr_path"])
 
     # Generate synthetic genesis points
@@ -92,15 +91,16 @@ def main(
         "WMO_PRES",
     ]
 
+    # Get additionnal data
+    ibtracs = read_ibtracs(
+        fpath=Path(data_dir / gen_config["ibtracs_path"]), usecols=usecols
+    )
 
-    #Get additionnal data
-    ibtracs = read_ibtracs(fpath=Path(data_dir / gen_config["ibtracs_path"]), usecols=usecols)
-  
-    #Historical data for debiasing
+    # Historical data for debiasing
     clim_obs_histo = get_era5_benchmark(benchmark_path=bias_correction_path)
-    clim_sim_histo_ds = xr.open_zarr(
-        cmip_dir / f"{model}/historical", chunks="auto"
-    )[["hurs", "psl", "ta", "tos"]].rename({"hurs": "hur"}) # TODO: move rename to cmip6_pangeo.py
+    clim_sim_histo_ds = xr.open_zarr(cmip_dir / f"{model}/historical", chunks="auto")[
+        ["hurs", "psl", "ta", "tos"]
+    ].rename({"hurs": "hur"})  # TODO: move rename to cmip6_pangeo.py
     clim_sim_histo = get_histo_sim_from_benchmark(
         benchmark=clim_obs_histo, histo_clim_ds=clim_sim_histo_ds
     )
@@ -110,7 +110,7 @@ def main(
         / (clim_sim_histo["SST"] + 273.15),
     )
 
-    #Logger
+    # Logger
     logger.remove()
     logfile = "debug.log"
     # Add a file sink for debugging logs
@@ -118,90 +118,89 @@ def main(
         logfile, rotation="10 MB", enqueue=True
     )  # Rotates file when it reaches 10MB
 
-
-
     """
     Simulate starting points
     TODO: set displace=True
     """
     logger.info("Create starting point...")
 
-    simulate_tc_genesis(
-        ibtracs=ibtracs,
-        land_zip_path=land_zip_path,
-        resolution=gen_config["resolution"],
-        n_seeds=n_seeds,
-        start_year=start_year,
-        end_year=end_year,
-        save_dir=cyclones_tracks_dir,
-        displace=False,
-    )
+    # simulate_tc_genesis(
+    #     ibtracs=ibtracs,
+    #     land_zip_path=land_zip_path,
+    #     resolution=gen_config["resolution"],
+    #     n_seeds=n_seeds,
+    #     start_year=start_year,
+    #     end_year=end_year,
+    #     save_dir=cyclones_tracks_dir,
+    #     displace=False,
+    # )
 
     """
     Create tracks
     TODO: simulate_tc_tracks
     """
-    logger.info("Create tracks...")
-    genesis_ds = pds.dataset(
-        cyclones_tracks_dir,
-        format="parquet",
-        partitioning="hive",
-    )
+    # logger.info("Create tracks...")
+    # genesis_ds = pds.dataset(
+    #     cyclones_tracks_dir,
+    #     format="parquet",
+    #     partitioning="hive",
+    # )
 
-    batch_seeds = list(more_itertools.chunked(list(range(n_seeds)), n=batch_seed_size))
+    # batch_seeds = list(more_itertools.chunked(list(range(n_seeds)), n=batch_seed_size))
 
-    with tqdm_joblib(batch_seeds, desc="Processing seeds", position=0, total=len(batch_seeds), leave=True,
-    ) as progress_bar:
-        Parallel(n_jobs=n_job, backend="loky")(
-            delayed(simulate_tc_tracks)(
-                genesis_ds= genesis_ds,
-                catherina_fit_path = fit_dir,
-                max_steps=max_step,
-                seeds=seeds,
-                logfile=logfile,
-                save_dir=tracks_dir,
-            )
-            for batch_id, seeds in enumerate(batch_seeds)
-        )
+    # with tqdm_joblib(batch_seeds, desc="Processing seeds", position=0, total=len(batch_seeds), leave=True,
+    # ) as progress_bar:
+    #     Parallel(n_jobs=n_job, backend="loky")(
+    #         delayed(simulate_tc_tracks)(
+    #             genesis_ds= genesis_ds,
+    #             catherina_fit_path = fit_dir,
+    #             max_steps=max_step,
+    #             seeds=seeds,
+    #             logfile=logfile,
+    #             save_dir=tracks_dir,
+    #         )
+    #         for batch_id, seeds in enumerate(batch_seeds)
+    #     )
 
     """
     Add climate variables
     """
-    logger.info("Add climate variable...")
-    clim_ds = xr.open_zarr(cmip_dir / model / experiment)
-    tracks = pds.dataset(tracks_dir, format="parquet", partitioning="hive")
+    # logger.info("Add climate variable...")
+    # clim_ds = xr.open_zarr(cmip_dir / model / experiment)
+    # tracks = pds.dataset(tracks_dir, format="parquet", partitioning="hive")
 
-    yearmonth_batches = list(itertools.product(range(start_year, end_year), range(1, 12+1))) 
-    tasks = []
-    for yearmonth in yearmonth_batches:
-        tasks.append(yearmonth)
+    # yearmonth_batches = list(itertools.product(range(start_year, end_year), range(1, 12+1)))
+    # tasks = []
+    # for yearmonth in yearmonth_batches:
+    #     tasks.append(yearmonth)
 
-    Parallel(n_jobs=n_job, prefer="threads")(
-                delayed(process_month)(
-                    year=year,
-                    month=month,
-                    clim_ds=clim_ds,
-                    model=model,
-                    experiment=experiment,
-                    tracks=tracks,
-                    save_dir=tracks_with_env_dir,
-                )
-                for year, month in tqdm(tasks, desc="year-month")
-            )
+    # Parallel(n_jobs=n_job, prefer="threads")(
+    #             delayed(process_month)(
+    #                 year=year,
+    #                 month=month,
+    #                 clim_ds=clim_ds,
+    #                 model=model,
+    #                 experiment=experiment,
+    #                 tracks=tracks,
+    #                 save_dir=tracks_with_env_dir,
+    #             )
+    #             for year, month in tqdm(tasks, desc="year-month")
+    #         )
 
     """
     Debias climate variables
     """
     logger.info(
-            "Debiasing climate variables for future tracks based on observed (ERA5) and simulated (CMIP6) historical data"
-        )
+        "Debiasing climate variables for future tracks based on observed (ERA5) and simulated (CMIP6) historical data"
+    )
 
-    #Create a pyarrow scanner for the parquet file
+    # Create a pyarrow scanner for the parquet file
     tracks_with_env_ds = pds.dataset(
         tracks_with_env_dir, format="parquet", partitioning="hive"
     )
-    #todo: batch seeds
-    for seed in range(n_seeds): #range(gen_config["n_seeds"]):
+    print('a')
+    # todo: batch seeds
+    for seed in range(n_seeds):  # range(gen_config["n_seeds"]):
         correct_bias_with_era5_and_save(
             seeds=[seed],
             tracks_with_env_ds=tracks_with_env_ds,
@@ -214,20 +213,23 @@ def main(
 
     """
     Intensify and decay
-    """   
+    """
     logger.info("Intensifying tracks...")
-    seed_batches = list(itertools.batched(range(n_seeds), n=batch_seed_size))  # or 4/8 depending on RAM
+    print("intensifying tracks...")
+    seed_batches = list(
+        itertools.batched(range(n_seeds), n=batch_seed_size)
+    )  # or 4/8 depending on RAM
     tasks = []
     for seeds in seed_batches:
         tasks.append(seeds)
 
-    Parallel(n_jobs=n_job, prefer="processes")(  # n=4
+    Parallel(n_jobs=1, prefer="processes")(  # n=4
         delayed(intensify_and_save)(
             batch_seeds=list(batch_seeds),
             corrected_tracks_dir=tracks_with_env_corr_dir,
             catherina_fit_path=catherina_fit_path,
-            ne_10m_coastline_zip = ne_10m_coastline_zip_path,
-            ne_10m_land_zip =ne_10m_coastline_zip_path,
+            ne_10m_coastline_zip=ne_10m_coastline_zip_path,
+            ne_10m_land_zip=ne_10m_coastline_zip_path,
             save_dir=intens_dir,
         )
         for batch_seeds in tqdm(tasks, desc="seed")
