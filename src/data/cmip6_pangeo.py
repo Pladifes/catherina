@@ -1,3 +1,6 @@
+"""Fetch CMIP6 climate data from pangeo API and store as zarr files."""
+
+import json
 import pprint
 import webbrowser
 import cf_xarray as cfxr
@@ -13,9 +16,9 @@ from pathlib import Path
 
 
 def get_cmip6_data_from_pangeo_api(
-    source_id: str, experiment_id: str, store_dir: Path
+    source_id: str, experiment_id: str, store_dir: Path, institution_id: str, member_id: str
 ) -> None:
-    query_list = generate_cmip6_queries(source_id, experiment_id, tbl_var)
+    query_list = generate_cmip6_queries(source_id, experiment_id, tbl_var, institution_id, member_id)
     queries_pbar = tqdm(query_list, desc="Processing pangeo queries")
     for query in queries_pbar:
         queries_pbar.set_postfix(climate_var=query["variable_id"])
@@ -124,7 +127,8 @@ def generate_cmip6_queries(
     source_ids: list[str],
     experiment_ids: list[str],
     table_variables: dict[str, list[str]],
-    member_id: str = "r1i1p1f1",
+    institution_id: str,
+    member_id: str,
     grid_label: list[str] = ["gn"],
 ) -> list[dict]:
     """
@@ -160,7 +164,7 @@ def generate_cmip6_queries(
                 "variable_id": variable,
                 "member_id": member_id,
                 "grid_label": grid_label,
-                "institution_id": "CSIRO-ARCCSS" # TODO: filter on institution to pick same as original implementation
+                "institution_id": institution_id
             }
             query_list.append(query)
 
@@ -186,15 +190,23 @@ if __name__ == "__main__":
     url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
     col = intake.open_esm_datastore(url)
     z_kwargs = {"consolidated": True, "decode_times": True, "use_cftime": True}
+    with open("data/input/parameters_for_climate_scenario.json", "r") as f:
+        queries = json.load(f)
+    query = queries[4]
     # source_id in emsl refers to model_id in catherina
-    source_id = ["ACCESS-CM2"] #, "MIROC-ES2L"] #"UKESM1-0-LL"]
-    pprint.pprint(source_id)
+
+    pprint.pprint(query)
     # "MPI-ESM1-2-LR", "ACCESS-CM2"
-    experiment_id = ["ssp585"]
-    pprint.pprint(f"experiments: {experiment_id}")
+
+    ### TODO lire json et dire que on a remplacé ipsl_cm5a2_inca par ipsl-cm6a-lr
+
+    ### CHANGER ICI POUR SCENARIO FUTUR OU HISTORIQUE ###
+    # experiment_id = ["historical"] # pour récupérer les données simulées historiques pour le débiaisage 
+
     tbl_var = {"Amon": ["hurs", "psl", "ta", ], "Omon": ["tos"]}
     store_dir = "./data/input/cmip6_data"
     print(f"Save dir: {store_dir}")
     get_cmip6_data_from_pangeo_api(
-        source_id=source_id, experiment_id=experiment_id, store_dir=store_dir
+        source_id=query["source_id"], experiment_id=query["experiment_id"], store_dir=store_dir, institution_id=query["institution_id"], member_id=query["member_id"]
     )
+    print("------------ pangeo done ------------")

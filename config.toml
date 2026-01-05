@@ -6,15 +6,16 @@ output_data_dir = "./data/output/catherina"
 climate_data_dir = "cmip6_data"
 bcorr_path = "bias_correction/ERA5_benchmark_100tracks_bias_corrections.csv"
 country_shp_path = "country_data/50m_cultural/ne_50m_admin_0_countries.shp"
-start_year = 2025 # for intensification
-end_year = 2100 #for generation
+start_year = 1980 # for intensification
+end_year = 2015 #for generation
 bias_correction = true
 proj_crs = "EPSG: 3857" #Web-Mercator projection
-n_seeds = 1 #standard value
+n_seeds = 100 #standard value
 n_jobs = 8
 batch_seeds_size=1
 models = ["ACCESS-CM2"] #Only 1
 experiments = ["ssp585"] #Only 1
+# experiments = ["historical"] #Only 
 my_models = [
 "cmcc_cm2_sr5",
 "miroc_es2l",

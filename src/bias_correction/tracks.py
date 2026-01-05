@@ -1,3 +1,4 @@
+import tomllib
 from joblib import Parallel, delayed
 import pandas as pd
 import xarray as xr
@@ -11,6 +12,7 @@ import geopandas as gpd
 import numpy as np
 import pyarrow as pa 
 import pyarrow.parquet as pq
+import sys
 
 
 def correct_bias_with_era5_and_save(seeds: list, 
@@ -298,25 +300,70 @@ def get_era5_benchmark(benchmark_path: Path):
     return benchmark
 
 
-if __name__ == "__main__":
-    data_dir = Path("../../data")
+def correct_all_clim_bias(
+    main_config: dict,
+    output_dir: Path,
+)-> None:
+
+    data_dir = Path(main_config["input_data_dir"])
+
+    # Number seeds + jobs + batch size + nb steps
+    n_seeds = main_config["n_seeds"]
+
+    # Model and experiment
+    model = main_config["models"][0]
+    experiment = main_config["experiments"][0]
+
+    tracks_with_env_dir = output_dir / "track_with_env" / model / experiment
+    if not tracks_with_env_dir.exists():
+        raise ValueError(f"Provided tracks_with_env_dir path {tracks_with_env_dir} does not exist.")
+
+    tracks_with_env_corr_dir = output_dir / "track_with_env_corr" / model / experiment
+
     # Define the path to the intensified tracks file
     intensified_tracks_path = data_dir / "intensified_tracks/ACCESS-CM2/ssp585/"
 
-    benchmark_path = data_dir / "ERA5_benchmark_100tracks_bias_corrections.csv"
+    benchmark_path = data_dir / "bias_correction" / "ERA5_benchmark_100tracks_bias_corrections.csv"
+    cmip_dir = data_dir / Path(main_config["climate_data_dir"])
+
+    # Historical data for debiasing
     clim_obs_histo = get_era5_benchmark(benchmark_path=benchmark_path)
-    clim_sim_histo_ds = xr.open_zarr(
-        data_dir / "cmip6_data/ACCESS-CM2/historical", chunks="auto"
-    )
+    clim_sim_histo_ds = xr.open_zarr(cmip_dir / f"{model}/historical", chunks="auto")[
+        ["hurs", "psl", "ta", "tos"]
+    ].rename({"hurs": "hur"})  # TODO: move rename to cmip6_pangeo.py
     clim_sim_histo = get_histo_sim_from_benchmark(
         benchmark=clim_obs_histo, histo_clim_ds=clim_sim_histo_ds
     )
     clim_sim_histo = clim_sim_histo.assign(
         MSLP=clim_sim_histo["MSLP"] / 100.0,
-        thermo_eff=((clim_sim_histo["SST"]+273.15) - clim_sim_histo["T_strat"])
-        / (clim_sim_histo["SST"]+273.15),
+        thermo_eff=((clim_sim_histo["SST"] + 273.15) - clim_sim_histo["T_strat"])
+        / (clim_sim_histo["SST"] + 273.15),
     )
-    # Create a pyarrow scanner for the parquet file
-    intens_ds = pds.dataset(intensified_tracks_path, format="parquet", partitioning="hive")
 
-    correct_bias_with_era5(clim_obs_histo=clim_obs_histo, clim_sim_histo=clim_sim_histo, intens_ds=intens_ds)
+    # Create a pyarrow scanner for the parquet file
+    tracks_with_env_ds = pds.dataset(
+        tracks_with_env_dir, format="parquet", partitioning="hive"
+    )
+
+    # todo: batch seeds
+    for seed in range(n_seeds):  # range(gen_config["n_seeds"]):
+        correct_bias_with_era5_and_save(
+            seeds=[seed],
+            tracks_with_env_ds=tracks_with_env_ds,
+            clim_obs_histo=clim_obs_histo,
+            clim_sim_histo=clim_sim_histo,
+            model=model,
+            experiment=experiment,
+            save_dir=tracks_with_env_corr_dir,
+        )
+
+
+if __name__ == "__main__":
+
+    config_path: str = "./config.toml"
+    with open(config_path, "rb") as f:  # Open the file in binary mode
+        config_files = tomllib.load(f)
+
+    output_dir = Path(sys.argv[1])
+
+    correct_all_clim_bias(main_config=config_files["main_params"], output_dir=output_dir)

@@ -124,68 +124,68 @@ def main(
     """
     logger.info("Create starting point...")
 
-    # simulate_tc_genesis(
-    #     ibtracs=ibtracs,
-    #     land_zip_path=land_zip_path,
-    #     resolution=gen_config["resolution"],
-    #     n_seeds=n_seeds,
-    #     start_year=start_year,
-    #     end_year=end_year,
-    #     save_dir=cyclones_tracks_dir,
-    #     displace=False,
-    # )
+    simulate_tc_genesis(
+        ibtracs=ibtracs,
+        land_zip_path=land_zip_path,
+        resolution=gen_config["resolution"],
+        n_seeds=n_seeds,
+        start_year=start_year,
+        end_year=end_year,
+        save_dir=cyclones_tracks_dir,
+        displace=False,
+    )
 
     """
     Create tracks
     TODO: simulate_tc_tracks
     """
-    # logger.info("Create tracks...")
-    # genesis_ds = pds.dataset(
-    #     cyclones_tracks_dir,
-    #     format="parquet",
-    #     partitioning="hive",
-    # )
+    logger.info("Create tracks...")
+    genesis_ds = pds.dataset(
+        cyclones_tracks_dir,
+        format="parquet",
+        partitioning="hive",
+    )
 
-    # batch_seeds = list(more_itertools.chunked(list(range(n_seeds)), n=batch_seed_size))
+    batch_seeds = list(more_itertools.chunked(list(range(n_seeds)), n=batch_seed_size))
 
-    # with tqdm_joblib(batch_seeds, desc="Processing seeds", position=0, total=len(batch_seeds), leave=True,
-    # ) as progress_bar:
-    #     Parallel(n_jobs=n_job, backend="loky")(
-    #         delayed(simulate_tc_tracks)(
-    #             genesis_ds= genesis_ds,
-    #             catherina_fit_path = fit_dir,
-    #             max_steps=max_step,
-    #             seeds=seeds,
-    #             logfile=logfile,
-    #             save_dir=tracks_dir,
-    #         )
-    #         for batch_id, seeds in enumerate(batch_seeds)
-    #     )
+    with tqdm_joblib(batch_seeds, desc="Processing seeds", position=0, total=len(batch_seeds), leave=True,
+    ) as progress_bar:
+        Parallel(n_jobs=n_job, backend="loky")(
+            delayed(simulate_tc_tracks)(
+                genesis_ds= genesis_ds,
+                catherina_fit_path = fit_dir,
+                max_steps=max_step,
+                seeds=seeds,
+                logfile=logfile,
+                save_dir=tracks_dir,
+            )
+            for batch_id, seeds in enumerate(batch_seeds)
+        )
 
     """
     Add climate variables
     """
-    # logger.info("Add climate variable...")
-    # clim_ds = xr.open_zarr(cmip_dir / model / experiment)
-    # tracks = pds.dataset(tracks_dir, format="parquet", partitioning="hive")
+    logger.info("Add climate variable...")
+    clim_ds = xr.open_zarr(cmip_dir / model / experiment)
+    tracks = pds.dataset(tracks_dir, format="parquet", partitioning="hive")
 
-    # yearmonth_batches = list(itertools.product(range(start_year, end_year), range(1, 12+1)))
-    # tasks = []
-    # for yearmonth in yearmonth_batches:
-    #     tasks.append(yearmonth)
+    yearmonth_batches = list(itertools.product(range(start_year, end_year), range(1, 12+1)))
+    tasks = []
+    for yearmonth in yearmonth_batches:
+        tasks.append(yearmonth)
 
-    # Parallel(n_jobs=n_job, prefer="threads")(
-    #             delayed(process_month)(
-    #                 year=year,
-    #                 month=month,
-    #                 clim_ds=clim_ds,
-    #                 model=model,
-    #                 experiment=experiment,
-    #                 tracks=tracks,
-    #                 save_dir=tracks_with_env_dir,
-    #             )
-    #             for year, month in tqdm(tasks, desc="year-month")
-    #         )
+    Parallel(n_jobs=n_job, prefer="threads")(
+                delayed(process_month)(
+                    year=year,
+                    month=month,
+                    clim_ds=clim_ds,
+                    model=model,
+                    experiment=experiment,
+                    tracks=tracks,
+                    save_dir=tracks_with_env_dir,
+                )
+                for year, month in tqdm(tasks, desc="year-month")
+            )
 
     """
     Debias climate variables
@@ -198,7 +198,12 @@ def main(
     tracks_with_env_ds = pds.dataset(
         tracks_with_env_dir, format="parquet", partitioning="hive"
     )
-    print('a')
+
+    print("--- Correcting climate bias ---")
+
+    # TODO : uncomment to run all bias correction at once
+    # correct_all_clim_bias(main_config=config_files["main_params"], output_dir=output_dir)
+
     # todo: batch seeds
     for seed in range(n_seeds):  # range(gen_config["n_seeds"]):
         correct_bias_with_era5_and_save(

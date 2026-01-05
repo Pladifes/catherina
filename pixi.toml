@@ -8,7 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 polars = ">=1.27.1,<2"
-geopandas = ">=1.0.1,<2"
+geopandas = ">=1.1.2,<2"
 tqdm = ">=4.67.1,<5"
 seaborn = ">=0.13.2,<0.14"
 tabulate = ">=0.9.0,<0.10"
@@ -17,7 +17,7 @@ xarray = ">=2025.11.0,<2026"
 boto3 = ">=1.37.35,<2"
 fsspec = ">=2025.3.2,<2026"
 pyarrow = ">=19.0.1,<20"
-ipykernel = ">=6.29.5,<7"
+ipykernel = ">=7.1.0,<8"
 cdsapi = ">=0.7.5,<0.8"
 ipywidgets = ">=8.1.6,<9"
 iprogress = ">=0.4,<0.5"
@@ -65,6 +65,11 @@ reverse-geocode = ">=1.4.1,<2"
 zarr = ">=3.1.5,<4"
 setuptools = "<81"
 cf_xarray = ">=0.10.9,<0.11"
+jupyter = ">=1.1.1,<2"
+contextily = ">=1.7.0,<2"
+shapely = ">=2.1.2,<3"
+pyproj = ">=3.7.2,<4"
+openpyxl = ">=3.1.5,<4"
 
 
 [pypi-dependencies]
@@ -75,5 +80,6 @@ more-itertools = "*"
 pangeo = 'python src/data/cmip6_pangeo.py'
 synth = 'python synthetic_tracks.py'
 intens = 'python intensify.py'
+debias = 'python src/bias_correction/tracks.py'
 
 test = 'pytest tests/ -v --tb=short'
