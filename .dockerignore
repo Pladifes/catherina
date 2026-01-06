@@ -1,0 +1,5 @@
+/data
+*.ipynb
+*.log
+.logs
+.pixi
