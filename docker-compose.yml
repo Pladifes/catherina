@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: pixi-test:latest
     volumes:
       - ./data/input:/app/data/input:ro
       - ./data/output:/app/data/output

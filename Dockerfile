@@ -19,5 +19,5 @@ COPY . .
 # Install dependencies from pixi.toml
 RUN pixi install
 
-# Default CMD: pass any argument to pixi run
-ENTRYPOINT ["pixi", "run"]
+# New (interactive-friendly):
+ENTRYPOINT ["tail", "-f", "/dev/null"]
