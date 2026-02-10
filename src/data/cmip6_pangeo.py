@@ -66,7 +66,7 @@ def get_cmip6_data_from_pangeo_api(
                 coords_to_reset = ["time_bounds", "lat_verticies", "lon_verticies"]
                 coords_to_reset = set(ds_clim.coords).intersection(coords_to_reset)
                 ds_clim = ds_clim.drop_vars(vars_to_drop).reset_coords(coords_to_reset)
-                if set(["lat_verticies", "lon_verticies"]).issubset(ds_clim.coords):
+                if set(["lat_verticies", "lon_verticies"]).issubset(ds_clim.variables):
                     ds_clim = ds_clim.rename(
                         {
                             "lat_verticies": "lat_vertices",
