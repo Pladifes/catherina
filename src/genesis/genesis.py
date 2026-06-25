@@ -166,6 +166,7 @@ def simulate_tc_genesis(
     n_seeds, 
     start_year, 
     end_year, 
+    max_seed_existing,
     save_dir: Path, 
     displace: bool = False
 ):
@@ -185,7 +186,7 @@ def simulate_tc_genesis(
     )
     logger.info("Sampling annual TC events for each basin")
     monthly_sim = simulate_tc_events(
-        seeds=list(range(n_seeds)),
+        seeds=list(range(max_seed_existing, max_seed_existing + n_seeds)),
         basins=basins,
         p_hist=p_hist,
         start_year=start_year,

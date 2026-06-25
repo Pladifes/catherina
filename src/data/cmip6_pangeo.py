@@ -21,6 +21,9 @@ def get_cmip6_data_from_pangeo_api(
     store_dir: Path,
     institution_id: str,
     member_id: str,
+    col,
+    tbl_var,
+    z_kwargs
 ) -> None:
     query_list = generate_cmip6_queries(
         source_id, experiment_id, tbl_var, institution_id, member_id
@@ -241,18 +244,22 @@ if __name__ == "__main__":
     url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
     col = intake.open_esm_datastore(url)
     z_kwargs = {"consolidated": True, "decode_times": True, "use_cftime": True}
-    with open("./parameters_for_climate_scenario.json", "r") as f:
+    with open("./scenario_experiment_combination.json", "r") as f:
         queries = json.load(f)
-    query = queries[4]
+
+    #### TO ADAPT TO THE SCENARIO / EXPERIMENT ####
+    query = queries[0] 
+    experiment_id = query["experiments"][0]
     # source_id in emsl refers to model_id in catherina
 
-    pprint.pprint(query)
-    # "MPI-ESM1-2-LR", "ACCESS-CM2"
+    source_id = query["source_id"]
+    institution_id = query["institution_id"]
+    member_id = query["member_id"]
 
-    ### TODO lire json et dire que on a remplacé ipsl_cm5a2_inca par ipsl-cm6a-lr
-
-    ### CHANGER ICI POUR SCENARIO FUTUR OU HISTORIQUE ###
-    # experiment_id = ["historical"] # pour récupérer les données simulées historiques pour le débiaisage
+    pprint.pp(f"source_id      : {source_id}")
+    pprint.pp(f"experiment_id  : {experiment_id}")
+    pprint.pp(f"institution_id : {institution_id}")
+    pprint.pp(f"member_id      : {member_id}")
 
     tbl_var = {
         "Amon": [
@@ -265,10 +272,13 @@ if __name__ == "__main__":
     store_dir = "./data/input/cmip6_data"
     print(f"Save dir: {store_dir}")
     get_cmip6_data_from_pangeo_api(
-        source_id=query["source_id"],
-        experiment_id=query["experiment_id"],
+        source_id=source_id,
+        experiment_id=experiment_id,
         store_dir=store_dir,
-        institution_id=query["institution_id"],
-        member_id=query["member_id"],
+        institution_id=institution_id,
+        member_id=member_id,
+        col=col,
+        tbl_var=tbl_var,
+        z_kwargs=z_kwargs
     )
     print("------------ pangeo done ------------")

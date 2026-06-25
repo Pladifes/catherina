@@ -70,6 +70,8 @@ contextily = ">=1.7.0,<2"
 shapely = ">=2.1.2,<3"
 pyproj = ">=3.7.2,<4"
 openpyxl = ">=3.1.5,<4"
+skrub = ">=0.7.2,<0.8"
+reverse_geocoder = ">=1.5.1,<2"
 
 
 [pypi-dependencies]

@@ -1,7 +1,9 @@
-/data
 .logs
 debug.log
 **/__pycache__
 # pixi environments
 .pixi
 *.egg-info
+data/**
+!data/**/
+!data/**/.gitkeep

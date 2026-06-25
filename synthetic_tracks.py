@@ -12,6 +12,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from tqdm_joblib import tqdm_joblib
 import more_itertools
+import os
+import re
 
 from src.bias_correction.tracks import (
     correct_bias_with_era5_and_save,
@@ -25,6 +27,8 @@ from src.track_generation.track_generation import simulate_tc_tracks
 from src.climate_data_merging.climate_data_merging import process_month
 from src.bias_correction.bias_correction import correct_bias_with_era5_and_save
 from src.intensitifcation_and_decay.intensify import intensify_and_save
+
+warnings.filterwarnings("ignore")
 
 
 def main(
@@ -63,8 +67,8 @@ def main(
     # Project
     data_dir = Path(main_config["input_data_dir"])
     output_dir = Path(main_config["output_data_dir"])
-    cyclones_tracks_dir = output_dir / "genesis"
-    tracks_dir = output_dir / "track"
+    cyclones_tracks_dir = output_dir / "genesis" / model / experiment
+    tracks_dir = output_dir / "track" / model / experiment
     tracks_with_env_dir = output_dir / "track_with_env" / model / experiment
     tracks_with_env_corr_dir = output_dir / "track_with_env_corr" / model / experiment
     intens_dir = output_dir / "intensified_tracks" / model / experiment
@@ -110,6 +114,32 @@ def main(
         / (clim_sim_histo["SST"] + 273.15),
     )
 
+    # Check if output data already exists and if yes the number of seeds already run
+    max_seed_existing = 0
+
+    try:
+        pattern = re.compile(r"seed=(\d+)")
+
+        for folder in os.listdir(intens_dir):
+            match = pattern.match(folder)
+            if match:
+                value_seed = int(match.group(1))
+                if value_seed > max_seed_existing:
+                    max_seed_existing = value_seed 
+        for folder in os.listdir(cyclones_tracks_dir):
+            match = pattern.match(folder)
+            if match:
+                value_seed = int(match.group(1))
+                if value_seed > max_seed_existing:
+                    max_seed_existing = value_seed
+
+        max_seed_existing += 1
+
+    except:
+        pass
+
+    print("Starting at seed number: ", max_seed_existing)
+
     # Logger
     logger.remove()
     logfile = "debug.log"
@@ -131,6 +161,7 @@ def main(
         n_seeds=n_seeds,
         start_year=start_year,
         end_year=end_year,
+        max_seed_existing=max_seed_existing,
         save_dir=cyclones_tracks_dir,
         displace=False,
     )
@@ -146,7 +177,7 @@ def main(
         partitioning="hive",
     )
 
-    batch_seeds = list(more_itertools.chunked(list(range(n_seeds)), n=batch_seed_size))
+    batch_seeds = list(more_itertools.chunked(list(range(max_seed_existing, max_seed_existing+n_seeds)), n=batch_seed_size))
 
     with tqdm_joblib(batch_seeds, desc="Processing seeds", position=0, total=len(batch_seeds), leave=True,
     ) as progress_bar:
@@ -168,6 +199,7 @@ def main(
     logger.info("Add climate variable...")
     clim_ds = xr.open_zarr(cmip_dir / model / experiment)
     tracks = pds.dataset(tracks_dir, format="parquet", partitioning="hive")
+    tracks = tracks.filter(pds.field("seed").isin((range(max_seed_existing, max_seed_existing+n_seeds))))
 
     yearmonth_batches = list(itertools.product(range(start_year, end_year), range(1, 12+1)))
     tasks = []
@@ -198,6 +230,8 @@ def main(
     tracks_with_env_ds = pds.dataset(
         tracks_with_env_dir, format="parquet", partitioning="hive"
     )
+    tracks_with_env_ds = tracks_with_env_ds.filter(pds.field("seed").isin((range(max_seed_existing, max_seed_existing+n_seeds))))
+
 
     print("--- Correcting climate bias ---")
 
@@ -205,7 +239,7 @@ def main(
     # correct_all_clim_bias(main_config=config_files["main_params"], output_dir=output_dir)
 
     # todo: batch seeds
-    for seed in range(n_seeds):  # range(gen_config["n_seeds"]):
+    for seed in range(max_seed_existing, max_seed_existing+n_seeds):  # range(gen_config["n_seeds"]):
         correct_bias_with_era5_and_save(
             seeds=[seed],
             tracks_with_env_ds=tracks_with_env_ds,
@@ -222,7 +256,7 @@ def main(
     logger.info("Intensifying tracks...")
     print("intensifying tracks...")
     seed_batches = list(
-        itertools.batched(range(n_seeds), n=batch_seed_size)
+        itertools.batched(range(max_seed_existing, max_seed_existing+n_seeds), n=batch_seed_size)
     )  # or 4/8 depending on RAM
     tasks = []
     for seeds in seed_batches:
@@ -234,7 +268,7 @@ def main(
             corrected_tracks_dir=tracks_with_env_corr_dir,
             catherina_fit_path=catherina_fit_path,
             ne_10m_coastline_zip=ne_10m_coastline_zip_path,
-            ne_10m_land_zip=ne_10m_coastline_zip_path,
+            ne_10m_land_zip=land_zip_path,
             save_dir=intens_dir,
         )
         for batch_seeds in tqdm(tasks, desc="seed")

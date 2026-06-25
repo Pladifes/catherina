@@ -78,6 +78,14 @@ def intensify_and_save(
     gdf = gpd.GeoDataFrame(df,
                            geometry=gpd.points_from_xy(df.lon_left, df.lat_left),
                            crs=4326)
+    ############# ADDED #################
+    gdf = gdf.drop(columns=["index_right"], errors="ignore")
+    print("==============================")
+    print(gdf.columns.to_list())
+    print("==============================")
+    print(_BASINS_4326.columns.to_list())
+    print("==============================")
+    ###################################################
     gdf = gdf.sjoin(_BASINS_4326, 
                     how="left", 
                     predicate="within").drop(columns="index_right").\
@@ -423,8 +431,9 @@ def intensify_track_forward(
             seed = index_tuple[tracks.index.names.index("seed")] if "seed" in tracks.index.names else index_tuple[0]
             SID  = index_tuple[tracks.index.names.index("SID")]  if "SID"  in tracks.index.names else index_tuple[1]
             step = index_tuple[tracks.index.names.index("step")] if "step" in tracks.index.names else index_tuple[-1]
+
             stp  = stop_step.get((seed, SID))
-            return (stp is None) or (step <= stp-1) #We delete the row mathcing the condition
+            return (stp is None) or (step <= stp-1) #We delete the row matching the condition
 
         keep_mask = tracks.index.map(_keep_row)
         tracks = tracks.loc[keep_mask].copy()

@@ -43,15 +43,31 @@ def process_month(
         min_lat, max_lat = df["lat"].min(), df["lat"].max()
         min_lon, max_lon = df["lon"].min(), df["lon"].max()
         # FIXME: issue with selecting 2D lat and lon
+        # clim_df = (
+        #     clim_ds.sel(
+        #         time=f"{year:04d}-{month:02d}",
+        #         # lat=slice(min_lat, max_lat), # FIXME: uncomment if slow
+        #         # lon=slice(min_lon, max_lon),
+        #     )[["hurs", "psl", "ta", "tos"]]
+        #     .to_dataframe()
+        #     .rename(columns={"hurs": "hur"})
+        # )  # TODO: change hur to hurs everywhere
+
+        clim_subset = clim_ds.sel(
+            time=f"{year:04d}-{month:02d}"
+        )[["hurs", "psl", "ta", "tos"]]
+
+        # conversion propre du temps
+        # clim_subset["time"] = clim_subset.indexes["time"].to_datetimeindex()
+
         clim_df = (
-            clim_ds.sel(
-                time=f"{year:04d}-{month:02d}",
-                # lat=slice(min_lat, max_lat), # FIXME: uncomment if slow
-                # lon=slice(min_lon, max_lon),
-            )[["hurs", "psl", "ta", "tos"]]
+            clim_subset
             .to_dataframe()
             .rename(columns={"hurs": "hur"})
-        )  # TODO: change hur to hurs everywhere
+        )
+
+        clim_df = clim_df.reset_index()
+        clim_df["time"] = clim_df["time"].astype("datetime64[ns]")
 
         clim_df = gpd.GeoDataFrame(
             clim_df,

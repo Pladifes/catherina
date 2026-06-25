@@ -13,6 +13,8 @@ import numpy as np
 import pyarrow as pa 
 import pyarrow.parquet as pq
 import sys
+import os
+import re
 
 
 def correct_bias_with_era5_and_save(seeds: list, 
@@ -51,10 +53,16 @@ def correct_bias_with_era5_and_save(seeds: list,
         table = pa.Table.from_pandas(tracks)
 
         #Write Hive-style partitioned Parquet
-        logger.info(f"Writing dataset to {save_dir / 'corrected_tracks' / model / experiment}")
+        logger.info(f"Writing dataset to {save_dir}")
+        # pq.write_to_dataset(
+        #     table=table,
+        #     root_path=save_dir / "corrected_tracks" / model / experiment,  # output path
+        #     partition_cols=["seed", "year", "month"],  # Hive-style columns
+        #     existing_data_behavior="overwrite_or_ignore",  # optional: clean write
+        # )
         pq.write_to_dataset(
             table=table,
-            root_path=save_dir / "corrected_tracks" / model / experiment,  # output path
+            root_path=save_dir,  # output path
             partition_cols=["seed", "year", "month"],  # Hive-style columns
             existing_data_behavior="overwrite_or_ignore",  # optional: clean write
         )
@@ -320,11 +328,24 @@ def correct_all_clim_bias(
 
     tracks_with_env_corr_dir = output_dir / "track_with_env_corr" / model / experiment
 
-    # Define the path to the intensified tracks file
-    intensified_tracks_path = data_dir / "intensified_tracks/ACCESS-CM2/ssp585/"
-
     benchmark_path = data_dir / "bias_correction" / "ERA5_benchmark_100tracks_bias_corrections.csv"
     cmip_dir = data_dir / Path(main_config["climate_data_dir"])
+
+    # Check if output data already exists in the folder and if yes the number of seeds already run
+    intens_dir = output_dir / "intensified_tracks" / model / experiment
+    max_seed_existing = 0
+    try:
+        pattern = re.compile(r"seed=(\d+)")
+        for nom in os.listdir(intens_dir):
+            match = pattern.match(nom)
+            if match:
+                valeur = int(match.group(1))
+                if valeur > max_seed_existing:
+                    max_seed_existing = valeur
+        max_seed_existing += 1
+    except:
+        pass
+    print("Starting at seed number: ", max_seed_existing)
 
     # Historical data for debiasing
     clim_obs_histo = get_era5_benchmark(benchmark_path=benchmark_path)
@@ -346,7 +367,7 @@ def correct_all_clim_bias(
     )
 
     # todo: batch seeds
-    for seed in range(n_seeds):  # range(gen_config["n_seeds"]):
+    for seed in range(max_seed_existing, max_seed_existing+n_seeds):  # range(gen_config["n_seeds"]):
         correct_bias_with_era5_and_save(
             seeds=[seed],
             tracks_with_env_ds=tracks_with_env_ds,
