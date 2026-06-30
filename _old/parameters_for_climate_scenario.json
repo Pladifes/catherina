@@ -1,0 +1,39 @@
+[
+    {
+        "source_id": "ACCESS-CM2",
+        "institution_id": "CSIRO-ARCCSS",
+        "member_id": "r1i1p1f1",
+        "experiment_id": "ssp245"
+    },
+    {
+        "source_id": "MIROC-ES2L",
+        "institution_id": "MIROC",
+        "member_id": "r10i1p1f2",
+        "experiment_id": "ssp585"
+    },
+    {
+        "source_id": "MPI-ESM1-2-LR",
+        "institution_id": "MPI-M",
+        "member_id": "r1i1p1f1",
+        "experiment_id": "historical"
+    },
+    {
+        "source_id": "UKESM1-0-LL",
+        "institution_id": "MOHC",
+        "member_id": "r2i1p1f2",
+        "experiment_id": "historical"
+    },
+    {
+        "source_id": "FGOALS-g3",
+        "institution_id": "CAS",
+        "member_id": "r1i1p1f1",
+        "experiment_id": "historical"
+    },
+    {
+        "source_id": "IPSL-CM6A-LR",
+        "institution_id": "IPSL",
+        "member_id": "r6i1p1f1",
+        "experiment_id": "ssp370"
+    }
+    
+]

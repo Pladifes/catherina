@@ -85,3 +85,5 @@ intens = 'python intensify.py'
 debias = 'python src/bias_correction/tracks.py'
 
 test = 'pytest tests/ -v --tb=short'
+pangeo_aligned = 'python tools/run_cmip6_aligned.py'
+pangeo_safe = 'python tools/run_cmip6_safe.py'
