@@ -146,7 +146,7 @@ pixi install
 pixi run pangeo
 ```
 
-This executes `src/data/cmip6_pangeo.py` and downloads selected CMIP6 variables to `data/input/cmip6_data`. 
+This executes `src/data/cmip6_pangeo_regrid.py` and downloads selected CMIP6 variables to `data/input/cmip6_data`. 
 A more user-friendly approach is available in the notebook `Prepare_cmip6_data.ipynb`.
 
 ### Run the core pipeline
@@ -282,7 +282,7 @@ docker compose exec <service_name> bash
 ---
 ## Key files
 - `synthetic_tracks.py` — core generation pipeline
-- `src/data/cmip6_pangeo.py` — CMIP6 download and regridding
+- `src/data/cmip6_pangeo_regrid.py` — CMIP6 download and regridding
 - `config.toml` — default run configuration
 - `pixi.toml` — dependency and task definitions
 - `scenario_experiment_combination.json` — model/experiment selection for CMIP6 downloads
