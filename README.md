@@ -1,9 +1,9 @@
-# Catherina v2 — README_v2
+# README - Catherina
 
 ## Purpose
 This repository implements a synthetic tropical cyclone track generation pipeline, starting from CMIP6 climate data and ending with intensity-adjusted tracks. The main code path is:
 
-- `src/data/cmip6_pangeo.py`
+- `src/data/cmip6_pangeo_regrid.py`
 - `synthetic_tracks.py`
 
 The notebooks in `notebooks/` provide user-facing workflows to filter CMIP6 data, download climate input from Pangeo, and run multiple scenario experiments.
@@ -11,7 +11,7 @@ The notebooks in `notebooks/` provide user-facing workflows to filter CMIP6 data
 ---
 ## Main Pipeline
 
-### `src/data/cmip6_pangeo.py`
+### `src/data/cmip6_pangeo_regrid.py`
 This module downloads CMIP6 climate data from the Pangeo catalog and stores it as Zarr.
 
 Main features:
@@ -42,6 +42,7 @@ Key directories created under `data/output/catherina/`:
 - `intensified_tracks/<model>/<experiment>`
 
 This code is used by the notebook `Run_multiple_scenarios.ipynb` to run synthetic track simulation.
+
 
 ---
 ## Notebooks in `notebooks/`
@@ -75,6 +76,9 @@ It:
 - captures runtime output and return codes
 
 This notebook is intended to help batch-run multiple scenarios after the required CMIP6 and historical input files are available.
+
+### Note on the number of seeds
+During cyclone track simulations, the number of experiments is determined by the number of seeds. To obtain results that are sufficiently robust for a scientific publication, it is recommended to use around 200 seeds. Running the code with such a large number of seeds from the start usually causes it to crash. However, the code is designed so that it can be executed multiple times, with the new seeds simply being added to the existing results. Therefore, to reach a total of 200 seeds, it may be more practical to run the code 4 times with 50 seeds each. This can be controlled in the notebook `Run_multiple_scenarios.ipynb`.
 
 ---
 ## Draft notebooks in `_notebooks_draft/`
@@ -242,7 +246,7 @@ Handles spatial-temporal alignment of CMIP6 climate data with track points using
 ---
 ## Docker support
 
-A `Dockerfile` is included, but it may not work perfectly in all environments.
+A `Dockerfile` is included, but it may not work perfectly.
 
 ### Build the image
 ```bash

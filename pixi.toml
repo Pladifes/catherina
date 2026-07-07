@@ -79,7 +79,7 @@ tqdm-joblib = ">=0.0.4, <0.0.5"
 more-itertools = "*"
 
 [tasks]
-pangeo = 'python src/data/cmip6_pangeo.py'
+pangeo = 'python src/data/cmip6_pangeo_regrid.py'
 synth = 'python synthetic_tracks.py'
 intens = 'python intensify.py'
 debias = 'python src/bias_correction/tracks.py'
